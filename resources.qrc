@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/plugins/samon" >
+        <file>icon.png</file>
+    </qresource>
+</RCC>
