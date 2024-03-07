@@ -1,6 +1,6 @@
 # Samon
 
-Plugin Qgis pour la saisie monoscopique
+Plugin Qgis pour la saisie monoscopique. L'objectif est de calculer les coordonnées 3D du point cliqué sur la BD Ortho en corrigeant notamment le dévers. 
 
 
 

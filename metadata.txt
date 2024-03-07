@@ -10,7 +10,7 @@ version=0.1
 author=IGN
 email=celestin.huet@ign.fr
 
-about=Provide a brief description of the plugin and its purpose.
+about=Un seul clic sur la BD Ortho suffit pour obtenir les coordonnées 3D du point cliqué !
 
 tracker=http://bugs
 repository=https://gitlab.com/CHuet/samon_qgis
