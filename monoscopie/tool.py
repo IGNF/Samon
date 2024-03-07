@@ -3,9 +3,9 @@ from osgeo import gdal, osr
 import numpy as np
 
 def print_log(message:str)->None:
-    #print(message)
-    with open(os.path.join("/home", "CHuet2", "Documents", "Monoscopie_save", "log.txt"), "a") as f:
-        f.write("{}\n".format(str(message)))
+    print(message)
+    #with open(os.path.join("/home", "CHuet2", "Documents", "Monoscopie_save", "log.txt"), "a") as f:
+    #    f.write("{}\n".format(str(message)))
 
 
 

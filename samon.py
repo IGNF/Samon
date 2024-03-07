@@ -49,17 +49,6 @@ def print_log(message:str)->None:
     with open(os.path.join("Documents", "Monoscopie_save", "log.txt"), "a") as f:
         f.write("{}\n".format(str(message)))
 
-"""path_pysocle = os.path.join(os.path.dirname(__file__), "monoscopie", "PySocle")
-path_out = os.path.join(os.path.dirname(__file__), "monoscopie")
-print_log(path_pysocle)
-print_log(path_out)
-pip.main(['wheel', '--wheel-dir={0}'.format(path_out), path_pysocle])
-chemin_pysocle_whl = os.path.join(os.path.dirname(__file__), "monoscopie", "UNKNOWN-1.0.0-py3-none-any.whl")
-pip.main(['install', chemin_pysocle_whl])"""
-
-
-
-
 
 class Samon:
     """QGIS Plugin Implementation."""

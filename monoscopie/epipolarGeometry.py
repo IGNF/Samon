@@ -1,9 +1,6 @@
 
-from pysocle.photogrammetry.shot import Shot
 import numpy as np
-from osgeo import gdal
-import os
-from scipy import ndimage
+from .shot import Shot
 
 
 class EpipolarGeometry:
@@ -40,10 +37,10 @@ class EpipolarGeometry:
         Convertit les coordonnées images d'une image en coordonnées épipolaires
         """
 
-        focale = -image.imc.camera.focal
+        focale = -image.focal
 
-        c_shot = c - self.image1.imc.camera.x_ppa
-        l_shot = l - self.image1.imc.camera.y_ppa
+        c_shot = c - self.image1.x_ppa
+        l_shot = l - self.image1.y_ppa
         
         
         m = np.vstack([c_shot, l_shot, np.zeros(c_shot.shape)])
@@ -73,7 +70,7 @@ class EpipolarGeometry:
         Convertit les coordonnées épipolaires d'une image en coordonnées images
         """
 
-        focale = -image.imc.camera.focal
+        focale = -image.focal
 
         if use_dh:
             l -= self.dh
@@ -95,7 +92,7 @@ class EpipolarGeometry:
         x = -focale * ((C1E @ (m_f)) / (C3E @ (m_f)))
         y = -focale * ((C2E @ (m_f)) / (C3E @ (m_f)))
 
-        return x + image.imc.camera.x_ppa, y + image.imc.camera.y_ppa
+        return x + image.x_ppa, y + image.y_ppa
 
 
 
@@ -106,8 +103,8 @@ class EpipolarGeometry:
         """
         # Calcul de omega
 
-        R = im1.imc.mat_eucli
-        RA = im2.imc.mat_eucli
+        R = im1.mat_eucli
+        RA = im2.mat_eucli
 
         L2 = R[1,:]
         L3A = RA[2,:]
@@ -122,8 +119,8 @@ class EpipolarGeometry:
 
         # Calcul de n
         L3 = R[2,:]
-        s1 = im1.imc.sommet
-        s2 = im2.imc.sommet
+        s1 = im1.sommet
+        s2 = im2.sommet
         B = np.array([s2[0] - s1[0], s2[1] - s1[1], s2[2] - s1[2]]) * facteur_base
         d = np.sqrt((1+t**2) * (L3 @ B)**2 + (L1 @ B + t * L2 @ B)**2)
         n = np.array([L3 @ B / d, t * L3 @ B / d, -(L1 @ B + t * L2 @ B) / d])
@@ -163,9 +160,9 @@ class EpipolarGeometry:
         c_grid = c_grid.reshape((-1))
         l_grid = l_grid.reshape((-1))
 
-        x_world, y_world, z_world = self.image1.imc.image_to_world(c_grid, l_grid, self.dem)
+        x_world, y_world, z_world = self.image1.image_to_world(c_grid, l_grid, self.dem)
 
-        c_im2, l_im2 = self.image2.imc.world_to_image(x_world, y_world, z_world)
+        c_im2, l_im2 = self.image2.world_to_image(x_world, y_world, z_world)
 
         x1, y1 = self.image_to_epip(c_grid, l_grid, self.image1, self.r1e, use_dh=False)
         x2, y2 = self.image_to_epip(c_im2, l_im2, self.image2, self.r2e)

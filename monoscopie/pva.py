@@ -1,11 +1,10 @@
 import numpy as np
-from typing import Tuple, Union
-from osgeo import gdal, osr
+from osgeo import gdal
 from scipy import ndimage
 from .epipolarGeometry import EpipolarGeometry
-from pysocle.photogrammetry.shot import Shot
-import os
 from .tool import save_image
+from .shot import Shot
+from typing import Tuple
 
 class Pva:
 

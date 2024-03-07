@@ -6,12 +6,11 @@ from scipy import ndimage
 from shapely.geometry import Point, Polygon
 import geopandas
 import shutil
-from pysocle.photogrammetry.shot import Shot
-from pysocle.photogrammetry.ta import Ta
 from sklearn.feature_extraction.image import extract_patches_2d
 from typing import Tuple
 from .tool import print_log, save_image
 from .pva import Pva
+from .shot import Shot
 
 class OrthoLocale:
 
@@ -19,12 +18,11 @@ class OrthoLocale:
     Création d'une ortho construite à partir d'une pva
     """
 
-    def __init__(self, resolution: float, center: Point, shot: Shot, size: int, ta: Ta, pva_path: str, projet, path_save_pi: str, path_save_dec: str, dz=0.1) -> None:
+    def __init__(self, resolution: float, center: Point, shot: Shot, size: int, pva_path: str, projet, path_save_pi: str, path_save_dec: str, dz=0.1) -> None:
         self.resolution = resolution
         self.center = center
         self.shot:Shot = shot
         self.size = size
-        self.ta:Ta = ta
         self.pva_path = pva_path
 
         self.pva = Pva(self.pva_path, path_save_pi)
@@ -174,7 +172,7 @@ class OrthoLocale:
         y = self.y_max - self.resolution*(self.i_j[0])
 
         # On récupère l'altitude du point
-        z = self.projet.ta.project.dem.get(x, y).item()
+        z = self.projet.mnt.get(x, y).item()
         self.ground_terrain = Point(x, y, z)
 
     def save_correlation(self, methode: str) -> None:
@@ -200,8 +198,7 @@ class OrthoLocale:
         """
         Retourne le sommet de prise de vue
         """
-        image_conical = self.shot.imc
-        return np.array([image_conical.x_pos, image_conical.y_pos, image_conical.z_pos.item()])
+        return np.array([self.shot.x_pos, self.shot.y_pos, self.shot.z_pos.item()])
 
     def get_ground_terrain(self) -> np.array:
         """
@@ -213,7 +210,7 @@ class OrthoLocale:
         """
         Retourne le nadir du sommet de prise de vue
         """
-        return np.array([self.shot.imc.x_nadir, self.shot.imc.y_nadir, self.shot.imc.z_nadir])
+        return np.array([self.shot.x_nadir, self.shot.y_nadir, self.shot.z_nadir])
 
 
     def get_droite_sous_ech(self, image_maitresse: OrthoLocale, z_min:float, z_max:float) -> np.array:
@@ -226,21 +223,21 @@ class OrthoLocale:
         """
 
         P0_m = image_maitresse.get_sommet()
-        P0 = self.shot.imc.system.world_to_euclidean(P0_m[0], P0_m[1], P0_m[2])
+        P0 = self.shot.world_to_euclidean(P0_m[0], P0_m[1], P0_m[2])
         P0 = np.array([P0[0].item(), P0[1].item(), P0[2].item()])
 
         # Le point récupéré n'est pas le résultat de l'intersection des corrélations,
         # mais les coordonnées du point trouvé par corrélation sur cette ortholocale
         # On utilise comme z les données du MNT, mais ce n'est pas un problème car on a utilisé ce MNT pour construire l'ortholocale
         P_g_m = image_maitresse.get_ground_terrain()
-        P_g = self.shot.imc.system.world_to_euclidean(P_g_m[0], P_g_m[1], P_g_m[2])
+        P_g = self.shot.world_to_euclidean(P_g_m[0], P_g_m[1], P_g_m[2])
         P_g = np.array([P_g[0].item(), P_g[1].item(), P_g[2].item()])
         
         M = P_g - P0
 
         if z_min and z_max:
-            z_min_eucli = self.shot.imc.system.world_to_euclidean(P_g_m[0], P_g_m[1], z_min)[2].item()
-            z_max_eucli = self.shot.imc.system.world_to_euclidean(P_g_m[0], P_g_m[1], z_max)[2].item()
+            z_min_eucli = self.shot.world_to_euclidean(P_g_m[0], P_g_m[1], z_min)[2].item()
+            z_max_eucli = self.shot.world_to_euclidean(P_g_m[0], P_g_m[1], z_max)[2].item()
             z = np.arange(z_min_eucli, z_max_eucli, self.dz)
         else:
             z = np.arange(P_g[2]-20, P_g[2]+100, self.dz)
@@ -251,7 +248,7 @@ class OrthoLocale:
         l = np.repeat(l.reshape((-1, 1)), 3, axis=1)
         
         points = P0 + l * M
-        x, y, z = self.shot.imc.system.euclidean_to_world(points[:,0], points[:,1], points[:,2])
+        x, y, z = self.shot.euclidean_to_world(points[:,0], points[:,1], points[:,2])
 
         return np.concatenate((x.reshape((-1,1)), y.reshape((-1,1)), z.reshape((-1,1))), axis=1)
 
@@ -287,16 +284,14 @@ class OrthoLocale:
         yv_reshaped = yv.reshape((size**2* nb_ortho))
 
         #On récupère l'altitude en tout point
-        z = self.ta.project.dem.get(xv_reshaped, yv_reshaped)
+        z = self.projet.mnt.get(xv_reshaped, yv_reshaped)
         
         self.z_min = float(np.min(z))
         self.z_max = float(np.max(z))
 
-
-        c, l = self.shot.imc.world_to_image(xv_reshaped, yv_reshaped, z)
+        c, l = self.shot.world_to_image(xv_reshaped, yv_reshaped, z)
         c = c.reshape((nb_ortho, size**2))
         l = l.reshape((nb_ortho, size**2))
-
         
         inputds = gdal.Open(self.pva_path)
         max_c_raster = inputds.RasterXSize

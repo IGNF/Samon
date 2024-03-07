@@ -1,6 +1,0 @@
-<MasqImageIn>
-    <OneMasqueImage>
-        <PatternSel> (.*)\.tif</PatternSel>
-        <NomMasq>$1.masque.tif </NomMasq>
-    </OneMasqueImage>
-</MasqImageIn>

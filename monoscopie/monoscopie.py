@@ -1,4 +1,3 @@
-from pysocle.photogrammetry.ta import Ta
 from shapely.geometry import Point
 import os
 from .chantier import Chantier
@@ -8,7 +7,9 @@ import time
 from .tool import print_log 
 from .infosResultats import InfosResultats
 from .orthoLocale import OrthoLocale
+from .shot import Shot, MNT, RAF
 from tqdm import tqdm
+from lxml import etree
 
 class Monoscopie:
     """
@@ -18,7 +19,7 @@ class Monoscopie:
     def __init__(self, pva: str, ortho: str, mnt: str, ta_xml: str, resultats: str, raf: str, size_orthoLocale=141, size_bd_ortho=61, size_small_bd_ortho=5, seuil_maitresse=0.9, seuil_ortho_locale=0.4, log=False, micmac=False, decalage=False, type_correlation="pva", sauvegarde=False) -> None:
         self.pva = pva
         self.ortho = ortho
-        self.mnt = mnt
+        self.mnt = MNT(mnt)
         self.ta_xml = ta_xml
         self.resultats = resultats
         self.points: List[Point] = []
@@ -26,7 +27,7 @@ class Monoscopie:
         self.size_bd_ortho = size_bd_ortho
         self.seuil_maitresse = seuil_maitresse
         self.seuil_ortho_locale = seuil_ortho_locale
-        self.raf = raf
+        self.raf = RAF(raf)
         self.size_small_bd_ortho = size_small_bd_ortho
         self.log = log
         self.micmac = micmac
@@ -37,7 +38,14 @@ class Monoscopie:
         self.infosResultats = None
         self.sauvegarde = sauvegarde
 
-        # On charge le fichier ta_xml
+        self.shots = []
+
+        
+        self.get_shots()
+
+        # On récupère la résolution de l'ortho
+        self.get_resolution()
+        """# On charge le fichier ta_xml
         self.ta = Ta.from_xml(self.ta_xml)
         print_log("Fichier xml chargé")
 
@@ -45,8 +53,7 @@ class Monoscopie:
         self.ta.project.add_dem(self.mnt)
         print_log("MNT ajouté")
 
-        # On récupère la résolution de l'ortho
-        self.get_resolution()
+        
 
         # On retire les images qui ne sont pas dans le répertoire pva
         self.remove_shot()
@@ -62,7 +69,37 @@ class Monoscopie:
 
 
         # Facultatif : on exporte les emprises des clichés
-        #self.ta.save_extent_shot("test.shp")
+        #self.ta.save_extent_shot("test.shp")"""
+
+    
+    def getFocale(self, root):
+        focal = root.find(".//focal")
+        focale_x = float(focal.find(".//x").text)
+        focale_y = float(focal.find(".//y").text)
+        focale_z = float(focal.find(".//z").text)
+        return [focale_x, focale_y, focale_z]
+
+    def get_centre_rep_local(self, root):
+        centre_rep_local = root.find(".//centre_rep_local")
+        centre_rep_local_x = float(centre_rep_local.find(".//x").text)
+        centre_rep_local_y = float(centre_rep_local.find(".//y").text)
+        return [centre_rep_local_x, centre_rep_local_y]
+
+
+    def get_shots(self):
+        tree = etree.parse(self.ta_xml)
+        root = tree.getroot()
+        focale = self.getFocale(root)
+        centre_rep_local = self.get_centre_rep_local(root)
+        pvas = [i.split(".")[0] for i in os.listdir(self.pva)]
+        for cliche in root.getiterator("cliche"):
+            image = cliche.find("image").text.strip()
+            if image in pvas:
+                shot = Shot.createShot(cliche, focale, os.path.join(self.pva, "{}.tif".format(image)), self.raf, centre_rep_local)
+                self.shots.append(shot)
+
+
+
 
     
     def get_resolution(self) -> None:
@@ -75,10 +112,10 @@ class Monoscopie:
         print_log("Résolution de l'ortho : {}".format(self.resolution))
     
 
-    def remove_shot(self) -> None:
-        """
+    """def remove_shot(self) -> None:
+
         On retire de la liste des shots tous les shots dont les pvas correspondantes sont manquantes
-        """
+
         pvas = [i.split(".")[0] for i in os.listdir(self.pva)]
         compte = 0
         for flight in self.ta.project.get_flights():
@@ -92,7 +129,7 @@ class Monoscopie:
                 # On supprime ces images
                 for shot in shot_to_remove:
                     strip.remove_shot(shot)
-        print_log("{} images ont été retirées. Il en reste {}.".format(compte, self.ta.project.nbr_shot()))   
+        print_log("{} images ont été retirées. Il en reste {}.".format(compte, self.ta.project.nbr_shot()))   """
 
 
     def run(self, point:Point, orthoLocaleMaitresse:OrthoLocale=None, z_min:float=None, z_max:float=None, meme_bande=False):
@@ -107,7 +144,7 @@ class Monoscopie:
         self.chantier = Chantier(point, self.id, self.resolution, self, type_correlation=self.type_correlation, sauvegarde=self.sauvegarde)
         
         #On récupère les pvas dont l'emprise contient le point
-        self.chantier.get_pvas(self.ta.project.get_shots())
+        self.chantier.get_pvas(self.shots)
         print_log("get_pvas : {}".format(time.time()-tic))
         #S'il n'y a pas au moins deux pvas, alors on passe au point suivant
         if len(self.chantier.pvas) < 2:
@@ -150,7 +187,7 @@ class Monoscopie:
     def lancer_calcul(self):
         x_chap, nb_images, residus = self.chantier.compute_pseudo_intersection()
         self.chantier.x_chap = x_chap
-        z = self.ta.project.dem.get(self.chantier.point.x, self.chantier.point.y)
+        z = self.mnt.get(self.chantier.point.x, self.chantier.point.y)
         print_log("résultat final : {}".format(x_chap))
         if nb_images == 0:
             self.infosResultats = InfosResultats(False)

@@ -2,19 +2,15 @@ import os
 import shutil
 from shapely import contains
 import numpy as np
-from osgeo import gdal
 from .ortho import Ortho
 from .orthoLocale import OrthoLocale
 from typing import List, Tuple
 from shapely.geometry import LineString, Point
 import geopandas
-from lxml import etree
-from scipy.interpolate import griddata
-from plyfile import PlyData
-from pysocle.photogrammetry.shot import Shot
 from .tool import print_log, save_image
 from .correlation_engine import CorrelationEngine
 from .epipolarGeometry import EpipolarGeometry
+from .shot import Shot
 
 class Chantier:
     """
@@ -58,7 +54,7 @@ class Chantier:
         """
         self.pvas = []
         for shot in shots:
-            if contains(shot._extent, self.point):
+            if contains(shot.emprise, self.point):
                 self.pvas.append(shot)
         print_log("Nombre de pvas : {}".format(len(self.pvas)))
 
@@ -95,9 +91,9 @@ class Chantier:
         # On parcourt chaque pva
         for pva in self.pvas:
             # On crée une ortho locale à partir de cette pva
-            orthoLocale = OrthoLocale(self.resolution, self.point, pva, self.projet.size_orthoLocale, self.projet.ta, os.path.join(self.projet.pva, pva.image+".tif"), self.projet, os.path.join(self.path, "orthos_locales"), os.path.join(self.path, "decalage"))
+            orthoLocale = OrthoLocale(self.resolution, self.point, pva, self.projet.size_orthoLocale, os.path.join(self.projet.pva, pva.image+".tif"), self.projet, os.path.join(self.path, "orthos_locales"), os.path.join(self.path, "decalage"))
             ortho = None
-            if contains(pva._extent, orthoLocale.emprise):
+            if contains(pva.emprise, orthoLocale.emprise):
                 ortho = orthoLocale.create_small_ortho_numpy(np.array([orthoLocale.center.x]), np.array([orthoLocale.center.y]), orthoLocale.size, 3)
             # Il arrive que pour des pvas, on ne puisse pas produire d'ortho locale car le point se situe trop en extrémité d'image
             if ortho is not None:
@@ -262,13 +258,13 @@ class Chantier:
         s.to_file(os.path.join(self.path, "orthos_locales", "{}_epip.shp".format(ortho_locale.shot.image)))
 
 
-    def correlation_pvaGeomEpip(self, ortho_locale, c_image, l_image):
+    def correlation_pvaGeomEpip(self, ortho_locale:Shot, c_image, l_image):
         # On crée l'objet EpipolarGeometry qui calcule immédiatement les matrices pour passer de géométrie image à géométrie épipolaire
-        epipGeom = EpipolarGeometry(self.image_maitresse.shot, ortho_locale.shot, self.projet.ta.project.dem, self.projet.pva)
+        epipGeom = EpipolarGeometry(self.image_maitresse.shot, ortho_locale.shot, self.projet.mnt, self.projet.pva)
 
         # On construit la vignette maitresse à partir de la géométrie épipolaire de l'image maitresse 
-        z = self.projet.ta.project.dem.get(int(self.small_bd_ortho.centre.x), int(self.small_bd_ortho.centre.y))
-        centre_pva = self.image_maitresse.shot.imc.world_to_image(self.small_bd_ortho.centre.x, self.small_bd_ortho.centre.y, z)
+        z = self.projet.mnt.get(int(self.small_bd_ortho.centre.x), int(self.small_bd_ortho.centre.y))
+        centre_pva = self.image_maitresse.shot.world_to_image(self.small_bd_ortho.centre.x, self.small_bd_ortho.centre.y, z)
         c_centre_epip, l_centre_epip = epipGeom.image_to_epip(np.array([[centre_pva[0]]]), np.array([[centre_pva[1]]]), epipGeom.image1, epipGeom.r1e, use_dh=True)
 
         # On calcule dh au niveau du centre de la vignette maitresse
@@ -303,7 +299,7 @@ class Chantier:
 
         # On convertit ces coordonnées images en coordonnées terrain
         try :
-            x_chap, y_chap, z_chap = ortho_locale.shot.imc.image_to_world(c_chap, l_chap, self.projet.ta.project.dem)
+            x_chap, y_chap, z_chap = ortho_locale.shot.image_to_world(c_chap, l_chap, self.projet.mnt)
         except:
             x_chap, y_chap, z_chap = 0, 0, 0
             correlation_max = 0
@@ -314,7 +310,7 @@ class Chantier:
         
         correlationEngine = CorrelationEngine(ortho_locale, self.projet.size_small_bd_ortho, reference_ortho, v2=False)
         x_chap, y_chap, correlation_max = correlationEngine.run(x_world, y_world)
-        z_chap = self.projet.ta.project.dem.get(x_chap, y_chap).item()
+        z_chap = self.projet.mnt.get(x_chap, y_chap).item()
         return x_chap, y_chap, z_chap, correlation_max
 
 
@@ -327,7 +323,7 @@ class Chantier:
         ortho_locale.i_j = (i_chap, j_chap)
         # On convertit les coordonnées images en coordonnées terrain
         try:
-            x_chap, y_chap, z_chap = ortho_locale.shot.imc.image_to_world(j_chap, i_chap, self.projet.ta.project.dem)
+            x_chap, y_chap, z_chap = ortho_locale.shot.image_to_world(j_chap, i_chap, self.projet.mnt)
         except:
             return 0,0,0,0
         return x_chap, y_chap, z_chap, correlation_max
@@ -344,14 +340,14 @@ class Chantier:
             #On construit un sous-échantillonnage de la droite entre le sommet de prise de vue et le point terrain de la corrélation
             points = ortho_locale.get_droite_sous_ech(self.image_maitresse, z_min, z_max)
             #On reprojette la droite sur l'image épipolaire
-            c_image, l_image = ortho_locale.shot.imc.world_to_image(points[:,0], points[:,1], points[:,2])
+            c_image, l_image = ortho_locale.shot.world_to_image(points[:,0], points[:,1], points[:,2])
             #On reprojette en coordonnées du monde la droite (utile seulement si c'est de la corrélation sur ortho)
             try:
-                x_world, y_world, _ = ortho_locale.shot.imc.image_to_world(c_image, l_image, self.projet.ta.project.dem)
+                x_world, y_world, _ = ortho_locale.shot.image_to_world(c_image, l_image, self.projet.mnt)
                 ortho_locale.epip = [Point(x_world[0], y_world[0]), Point(x_world[-1], y_world[-1])]
             except Exception as e:
                 print_log("Exception : {}".format(e))
-                print_log("Exception : c_image, l_image : {}, {}, {}".format(c_image, l_image, self.projet.ta.project.dem))
+                print_log("Exception : c_image, l_image : {}, {}, {}".format(c_image, l_image, self.projet.mnt))
 
             #On sauvegarde les droites épipolaires sur pva et sur ortho locale
             if self.sauvegarde:
@@ -396,7 +392,7 @@ class Chantier:
             reference_ortho = self.small_bd_ortho.bd_ortho[0,:,:]
         elif self.type_correlation == "pva":
             point_terrain_correlation = self.image_maitresse.ground_terrain
-            x_image, y_image = self.image_maitresse.shot.imc.world_to_image(point_terrain_correlation.x, point_terrain_correlation.y, point_terrain_correlation.z)
+            x_image, y_image = self.image_maitresse.shot.world_to_image(point_terrain_correlation.x, point_terrain_correlation.y, point_terrain_correlation.z)
             reference_ortho = self.image_maitresse.pva.create_small_ortho_numpy(np.array([x_image]), np.array([y_image]), self.projet.size_small_bd_ortho, 1)
             if self.sauvegarde:
                 self.image_maitresse.pva.write_vignette(np.array([x_image]), np.array([y_image]), 201,  os.path.join(self.image_maitresse.path_save_pi, self.image_maitresse.shot.image+"_maitresse_pva.tif"))
@@ -415,7 +411,6 @@ class Chantier:
         """
         Calcule la pseudo-intersection à l'aide des moindres carrés
         """
-        system = self.ortho_locales[0].shot.imc.system
 
         # On calcule la pseudo-intersection par moindres carrés
         #n = len(ortho_locales_valides)
@@ -429,10 +424,10 @@ class Chantier:
 
                 # On construit une base orthonormée
                 gt = orthoLocale.get_ground_terrain()
-                gt_geoc = np.array(system.world_to_euclidean(gt[0], gt[1], gt[2]))
+                gt_geoc = np.array(orthoLocale.shot.world_to_euclidean(gt[0], gt[1], gt[2]))
 
                 gs = orthoLocale.get_sommet()
-                gs_geoc = np.array(system.world_to_euclidean(gs[0], gs[1], gs[2]))
+                gs_geoc = np.array(orthoLocale.shot.world_to_euclidean(gs[0], gs[1], gs[2]))
                 u = gt_geoc - gs_geoc
                 u /= np.linalg.norm(u)
                 v = np.random.uniform(size=(3))
@@ -454,333 +449,12 @@ class Chantier:
                 compte += 1
 
         x_chap, res, _, _ = np.linalg.lstsq(A, B, rcond=None)
-        resultat = system.euclidean_to_world(x_chap[0], x_chap[1], x_chap[2])
+        resultat = orthoLocale.shot.euclidean_to_world(x_chap[0], x_chap[1], x_chap[2])
 
         print_log("L'intersection est en ({}, {}, {}). Nombre d'images : {}".format(resultat[0].item(), resultat[1].item(), resultat[2].item(), n))
         print_log("Le résidu est de {} mètres".format(res.item()))
         return res.item(), resultat[0].item(), resultat[1].item(), resultat[2].item()
 
-
-    def compute_decalage(self) -> None:
-        """
-        Méthode par décalage : la corrélation ne se fait plus sur le point initial, mais un peu décalé sur 
-        la ligne de visée pour ne plus être gêné par le sursol
-        """
-
-        # On récupère le centre de corrélation de l'image maitresse
-        image_maitresse = self.ortho_locales[0]
-        centre = image_maitresse.ground_terrain
-
-        # On détermine le carré sur lequel se trouvera le nouveau point à corréler
-        x_int_0 = centre.x - self.projet.size_bd_ortho/4 * self.resolution
-        y_int_0 = centre.y + self.projet.size_bd_ortho/4 * self.resolution
-        x_int_1 = centre.x + self.projet.size_bd_ortho/4 * self.resolution
-        y_int_1 = centre.y - self.projet.size_bd_ortho/4 * self.resolution
-
-        #s = geopandas.GeoSeries([LineString([
-        #    (x_int_0, y_int_0), 
-        #    (x_int_1, y_int_0),
-        #    (x_int_1, y_int_1), 
-        #    (x_int_0, y_int_1), 
-        #    (x_int_0, y_int_0)])
-        #],)
-
-        #On projette la ligne de visée au sol
-        ligne_visee = LineString([(centre.x, centre.y), (image_maitresse.get_nadir()[0], image_maitresse.get_nadir()[1])])
-
-        #On intersecte la ligne de visée avec le carré
-        intersection = s.intersection(ligne_visee)
-        if len(intersection) != 1:
-            print_log("Curieux : il n'y a pas une unique intersection mais {}".format(len(intersection)))
-        centre_vignette = intersection[0]
-
-        #On construit la nouvelle ortho centrée sur ce nouveau point
-        self.bd_ortho_decalage = Ortho(self.resolution, int((self.projet.size_bd_ortho+1)/2), os.path.join(self.path, "decalage"), centre=centre_vignette, path_ortho=self.projet.ortho)
-        self.bd_ortho_decalage.create_ortho()
-        self.bd_ortho_decalage.save_ortho()
-        
-        #On calcule le point de corrélation
-        self.compute_correlations(self.bd_ortho_decalage, "dec")
-
-        #On supprime les pvas pour lesquelles la valeur de corrélation est trop faible
-        self.filter_ortho_locales(self.projet.seuil_ortho_locale, self.ortho_locales_valides_dec)
-        
-        #On calcule la pseudo-intersection
-        solution, nb_images, residus = self.compute_pseudo_intersection(self.ortho_locales_valides_dec)
-        z_chap = solution[2]
-
-        # On récupère le point sol
-        lamb = (z_chap - image_maitresse.get_sommet()[2]) / (image_maitresse.get_ground_terrain()[2] - image_maitresse.get_sommet()[2])
-        x_chap = image_maitresse.get_sommet()[0] + lamb * (image_maitresse.get_ground_terrain()[0] - image_maitresse.get_sommet()[0])
-        y_chap = image_maitresse.get_sommet()[1] + lamb * (image_maitresse.get_ground_terrain()[1] - image_maitresse.get_sommet()[1])
-        self.x_chap_dec = np.array([x_chap, y_chap, z_chap])
-
-
-
-    def create_nav_csv(self) -> None:
-        """
-        Crée un fichier navigation.csv qui contient les sommets de prise de vue et leurs orientations
-        """
-
-        with open(os.path.join(self.path, "micmac", "navigation.csv"), "w") as f:
-
-            # Ecriture de l'en-tête
-            f.write("#F=N X Y Z K W P\n#\n##image latitude longitude altitude Kappa Omega Phi\n")
-            # On parcourt toutes les pvas concernant le point
-            for ortho_locale in self.ortho_locales:
-                shot = ortho_locale.shot
-                nom = shot.image  # A faire en plus propre ?
-                
-                opk = shot.imc.system.mat_to_opk(shot.imc.mat)
-                omega = opk[0]
-                phi = opk[1]
-                kappa = opk[2]
-
-                image_conical = shot.imc
-                scale_factor = image_conical.system.proj_engine.get_scale_factor(image_conical.x_pos, image_conical.y_pos)
-                z_pos_cor = image_conical.z_pos + scale_factor * (image_conical.z_pos - self.projet.ta.project.dem.get(image_conical.x_pos, image_conical.y_pos))
-
-                # Pour chaque pva, on écrit dans le fichier csv les coordonnées du sommet de prise de vue et les orientations
-                f.write("{} {} {} {} {} {} {}\n".format(nom+".tif", image_conical.x_pos, image_conical.y_pos, z_pos_cor, kappa, omega, phi))
-
-
-    def get_sensor_size(self) -> Tuple[int, int]:
-        """
-        Il faut que toutes les images aient la même taille. On récupère la taille de l'extrait d'image la plus grande
-        """
-        
-        height_max = 0
-        width_max = 0
-        for ortho_locale in self.ortho_locales:
-
-            height_max = max(height_max, ortho_locale.max_l - ortho_locale.min_l)
-            width_max = max(width_max, ortho_locale.max_c - ortho_locale.min_c)
-
-        return height_max, width_max
-
-    def crop_images(self, height_max: int, width_max: int) -> None:
-        """
-        Découpe les pvas pour ne garder que les extraits nécessaires autour du point à calculer
-        """
-        
-        for ortho_locale in self.ortho_locales:
-            inputds = gdal.Open(os.path.join("chantiers", "49_2020", "pva", ortho_locale.shot.image+".jp2"))
-            image = inputds.ReadAsArray(ortho_locale.min_c, ortho_locale.min_l, width_max+1, height_max+1)
-            inputds = None
-            save_image(os.path.join(self.path, "micmac", ortho_locale.shot.image+".tif"), image)
-
-    def create_MicMac_LocalChantierDescripteur(self) -> Tuple[float, float, float]:
-        """
-        Crée un fichier MicMac-LocalChantierDescripteur.xml dont MicMac a besoin pour calculer un fichier d'orientation
-        """
-
-        # On récupère un template
-        tree = etree.parse(os.path.join("scripts", "MicMac-LocalChantierDescripteur.xml"))
-        root = tree.getroot()
-
-        # On récupère la caméra du chantier
-        camera_keys = list(self.projet.ta.project.camera)
-        camera_name = camera_keys[0]
-        camera = self.projet.ta.project.camera[camera_name]
-
-        # On modifie le nom de la caméra
-        root.find(".//Name").text = "{}".format(camera_name)
-
-        # On modifie la taille des capteurs
-        SzCaptMm_h = camera._h * camera._pixel_size * 1000
-        SzCaptMm_w = camera._w * camera._pixel_size * 1000
-        root.find(".//SzCaptMm").text = "{} {}".format(SzCaptMm_w, SzCaptMm_h)
-
-        # On modifie la focale
-        CalcName = camera._focal * camera._pixel_size * 1000
-        calcNameFindAll = root.findall(".//CalcName")
-        calcNameFindAll[0].text = "{}".format(camera_name)
-        calcNameFindAll[1].text = "{}".format(CalcName)
-
-        # On sauvegarde le fichier xml
-        with open(os.path.join(self.path, "micmac", "MicMac-LocalChantierDescripteur.xml"), "w") as f:
-            f.write(str(etree.tostring(tree, encoding='unicode')))
-
-        return camera._focal, camera._x_ppa, camera._y_ppa
-
-    
-    def update_ori(self, height_max: int, width_max: int, focale: float, x_ppa: int, y_ppa: int) -> None:
-        """
-        Modifie le fichier orientation pour qu'il soit adapté aux images réduites
-        """
-        
-        for ortho_locale in self.ortho_locales:
-
-            # On ouvre le fichier orientation d'une pva
-            tree = etree.parse(os.path.join(self.path, "micmac", "Ori-Nav-Crop", "Orientation-{}.tif.xml".format(ortho_locale.shot.image)))
-            root = tree.getroot()
-
-            # On corrige la position du PP
-            pp_balise = root.find(".//PP")
-            pp_balise.text = "{} {}".format(x_ppa - ortho_locale.min_c, y_ppa - ortho_locale.min_l)
-
-            # On corrige la taille de l'image
-            root.find(".//SzIm").text = "{} {}".format(width_max+1, height_max+1)
-
-            # On corrige la position du centre de distorsion
-            root.find(".//CDist").text = "{} {}".format(x_ppa - ortho_locale.min_c, y_ppa - ortho_locale.min_l)
-
-            # On corrige la focale
-            root.find(".//F").text = "{}".format(focale)
-
-            #Utile ??
-            ModRad = root.find(".//ModRad")
-            CalibDistortion = root.find(".//CalibDistortion")
-            CalibDistortion.remove(ModRad)
-            ModNoDist = etree.SubElement(CalibDistortion, "ModNoDist")
-            Inutile = etree.SubElement(ModNoDist, "Inutile")
-            Inutile.text = " "
-           
-            # On sauvegarde le fichier orientation
-            with open(os.path.join(self.path, "micmac", "Ori-Nav-Crop", "Orientation-{}.tif.xml".format(ortho_locale.shot.image)), "w") as f:
-                f.write(str(etree.tostring(tree, encoding='unicode')))
-
-    def interpolate(self, image_maitresse: OrthoLocale) -> float:
-        """
-        Cherche les coordonnées 3D du point terrain à partir du fichier généré par MicMac
-        """
-        # On ouvre le fichier NuageImProf_STD-MALT_Etape_6_XYZ.tif
-        # Ce fichier contient trois bandes : x, y et z. Avec l'aide de ces points, on peut interpoler
-        inputds = gdal.Open(os.path.join(self.path, "micmac", "MEC-Malt", "NuageImProf_STD-MALT_Etape_6_XYZ.tif"))
-
-        image = inputds.ReadAsArray()
-
-        x = image[0, :, :].reshape((-1, 1))
-        y = image[1, :, :].reshape((-1, 1))
-        z = image[2, :, :].reshape((-1, 1))
-
-        points = np.concatenate((x, y), axis=1)
-
-        z_alti = griddata(points, z, (image_maitresse.get_ground_terrain()[0], image_maitresse.get_ground_terrain()[1]), method='linear')
-        return z_alti
-
-
-    def compute_MicMac(self) -> None:
-        """
-        Recherche les coordonnées 3D du point avec la reconstruction 3D de MicMac
-        """
-
-        if not os.path.exists(os.path.join(self.path, "micmac")):
-            os.makedirs(os.path.join(self.path, "micmac"))
-
-        # On crée le fichier csv qui permettra à MicMac de créer un fichier orientation
-        self.create_nav_csv()
-
-        # On récupère la taille des imagettes
-        height_max, width_max = self.get_sensor_size()
-
-        # On découpe les images
-        self.crop_images(height_max, width_max)
-
-        # On crée le fichier MicMac_LocalChantierDescripteur
-        focale, x_ppa, y_ppa = self.create_MicMac_LocalChantierDescripteur()
-
-        # L'altitude du nadir étant souvent à 0, il faut la recalculer. MicMac en a besoin dans le fichier orientation
-        image_maitresse = self.ortho_locales[0]
-        z_nadir = self.projet.ta.project.dem.get(image_maitresse.get_nadir()[0], image_maitresse.get_nadir()[1]).item()
-
-        # On crée le fichier orientation MicMac
-        commande_export = 'mm3d OriConvert OriTxtInFile navigation.csv Nav AltiSol={} >> logfile'.format(z_nadir)
-        os.system("cd {}\n{}".format(os.path.join(self.path, "micmac"), commande_export))
-
-        shutil.copytree(os.path.join(self.path, "micmac", "Ori-Nav"),
-                        os.path.join(self.path, "micmac", "Ori-Nav-Crop"))
-
-        # On modifie les fichiers orientations car on a gardé seulement un extrait des images
-        self.update_ori(height_max, width_max, focale, x_ppa, y_ppa)
-
-
-        # On calcule la carte de profondeur avec Malt
-        nom_images = "|".join([i.shot.image + ".tif" for i in self.ortho_locales])
-        commande_Malt = 'mm3d Malt GeomImage "{}" Nav-Crop Master="{}" DirMEC=MEC-Malt >> logfile'.format(nom_images, image_maitresse.shot.image+".tif")
-
-        os.system("cd {}\n{}".format(os.path.join(self.path, "micmac"), commande_Malt))
-
-        # On crée un nuage de point et un fichier raster à la partir de la carte de profondeur de Malt
-        commande_Nuage2Ply = "mm3d Nuage2Ply MEC-Malt/NuageImProf_STD-MALT_Etape_6.xml Attr={} DoXYZ=1 >> logfile".format(image_maitresse.shot.image+".tif")
-
-        os.system("cd {}\n{}".format(os.path.join(self.path, "micmac"), commande_Nuage2Ply))
-
-        # On interpole l'altitude à partir des coordonnées du point sur l'image de référence
-        z_chap = self.interpolate(image_maitresse).item()
-
-        self.x_chap_micmac = np.array([image_maitresse.get_ground_terrain()[0], image_maitresse.get_ground_terrain()[1], z_chap])
-
-
-
-    def print_results(self, micmac: bool, decalage: bool) -> None:
-        """
-        Affiche les écarts entre les méthodes et avec les coordonnées plani initiales du point
-        """
-        print_log("Méthode par intersection : {}".format(self.x_chap))
-        if decalage:
-            print_log("Méthode par décalage : {}".format(self.x_chap_dec))
-        if micmac:
-            print_log("Méthode par MicMac : {}".format(self.x_chap_micmac))
-        print_log("")
-
-        print_log("intersection/point_init, dh : {} mètres".format(np.sqrt((self.x_chap[0] - self.point.x)**2 + (self.x_chap[1] - self.point.y)**2)))
-        if decalage:
-            print_log("décalage/point_init, dh : {} mètres".format(np.sqrt((self.x_chap_dec[0] - self.point.x)**2 + (self.x_chap_dec[1] - self.point.y)**2)))
-        if micmac:
-            print_log("micmac/point_init, dh : {} mètres".format(np.sqrt((self.x_chap_micmac[0] - self.point.x)**2 + (self.x_chap_micmac[1] - self.point.y)**2)))
-        print_log("")
-        
-        
-        if decalage:
-            print_log("intersection/décalage, dh : {} mètres".format(np.sqrt((self.x_chap[0] - self.x_chap_dec[0])**2 + (self.x_chap[1] - self.x_chap_dec[1])**2)))
-            print_log("intersection/décalage, dz : {} mètres".format(self.x_chap_dec[2] - self.x_chap[2]))
-            print_log("")
-
-        if micmac:
-            print_log("intersection/micmac, dh : {} mètres".format(np.sqrt((self.x_chap[0] - self.x_chap_micmac[0])**2 + (self.x_chap[1] - self.x_chap_micmac[1])**2)))
-            print_log("intersection/micmac, dz : {} mètres".format(self.x_chap_micmac[2] - self.x_chap[2]))
-            print_log("")
-
-        if decalage and micmac:
-            print_log("décalage/micmac, dh : {} mètres".format(np.sqrt((self.x_chap_dec[0] - self.x_chap_micmac[0])**2 + (self.x_chap_dec[1] - self.x_chap_micmac[1])**2)))
-            print_log("décalage/micmac, dz : {} mètres".format(self.x_chap_micmac[2] - self.x_chap_dec[2]))
-            print_log("")
-
-
-    def add_point_ply(self, point: np.array, couleur: Tuple[int, int, int]) -> None:
-        """
-        Ajoute le point dans le fichier ply généré par MicMac
-        """
-
-        if point[0] != 0 and point[1] != 0:
-
-            with open(os.path.join(self.path, "resultat.ply"), 'rb') as f:
-                plydata = PlyData.read(f)
-            
-            axe_x = np.linspace(point[0]-1, point[0]+1, num=100).reshape((100, 1))
-            axe_x_const = np.ones((100, 1)) * point[0]
-
-            axe_y = np.linspace(point[1]-1, point[1]+1, num=100).reshape((100, 1))
-            axe_y_const = np.ones((100, 1)) * point[1]
-
-            axe_z = np.linspace(point[2]-1, point[2]+1, num=100).reshape((100, 1))
-            axe_z_const = np.ones((100, 1)) * point[2]
-    
-            bloc1 = np.concatenate((axe_x, axe_y_const, axe_z_const), axis=1)
-            bloc2 = np.concatenate((axe_x_const, axe_y, axe_z_const), axis=1)
-            bloc3 = np.concatenate((axe_x_const, axe_y_const, axe_z), axis=1)
-
-            bloc_axes = np.concatenate((bloc1, bloc2, bloc3), axis=0)
-
-
-            for i in range(bloc_axes.shape[0]):
-                new_vertex = np.array((bloc_axes[i,0], bloc_axes[i,1], bloc_axes[i,2], couleur[0], couleur[1], couleur[2]), dtype=plydata['vertex'].data.dtype) 
-                plydata['vertex'].data = np.r_[plydata['vertex'].data, new_vertex]
-
-            
-            with open(os.path.join(self.path, "resultat.ply"), mode='wb') as f:
-                plydata.write(f)
 
     def get_liste_meme_bande(self)->List[str]:
         liste = []

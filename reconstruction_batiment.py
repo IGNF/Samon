@@ -55,10 +55,6 @@ resolution = 0.5
 
 
 
-
-
-
-
 def reconstruction(monoscopie:Monoscopie, fichier_xyz:str):
 
     # Création de la grille de points à calculer
