@@ -516,8 +516,6 @@ class Samon:
             print_log("MNT : {}".format(MNT))
             PVA = self.dlg.lineEdit_PVA.text()
             print_log("PVA : {}".format(PVA))
-            RAF = self.dlg.mMapLayerComboBox_RAF.currentLayer().dataProvider().dataSourceUri()
-            print_log("RAF : {}".format(RAF))
             type_correlation = str(self.dlg.comboBox.currentText())
             print_log("type_correlation : {}".format(type_correlation))
             self.sortie = self.dlg.lineEdit_sortie.text()
@@ -534,7 +532,6 @@ class Samon:
                 mnt=MNT, 
                 ta_xml=ta_xml, 
                 resultats=self.sortie, 
-                raf=RAF, 
                 size_orthoLocale=size_orthoLocale, 
                 size_bd_ortho=size_bd_ortho, 
                 size_small_bd_ortho=size_small_bd_ortho, 

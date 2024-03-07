@@ -81,19 +81,6 @@
     <string>Sélectionner ta_xml</string>
    </property>
   </widget>
-  <widget class="QLabel" name="label_5">
-   <property name="geometry">
-    <rect>
-     <x>130</x>
-     <y>190</y>
-     <width>211</width>
-     <height>21</height>
-    </rect>
-   </property>
-   <property name="text">
-    <string>Sélectionner RAF</string>
-   </property>
-  </widget>
   <widget class="QLabel" name="label_6">
    <property name="geometry">
     <rect>
@@ -262,16 +249,6 @@
     <rect>
      <x>350</x>
      <y>100</y>
-     <width>160</width>
-     <height>27</height>
-    </rect>
-   </property>
-  </widget>
-  <widget class="QgsMapLayerComboBox" name="mMapLayerComboBox_RAF">
-   <property name="geometry">
-    <rect>
-     <x>350</x>
-     <y>190</y>
      <width>160</width>
      <height>27</height>
     </rect>

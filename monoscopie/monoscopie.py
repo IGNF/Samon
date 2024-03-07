@@ -8,15 +8,15 @@ from .tool import print_log
 from .infosResultats import InfosResultats
 from .orthoLocale import OrthoLocale
 from .shot import Shot, MNT, RAF
-from tqdm import tqdm
 from lxml import etree
+
 
 class Monoscopie:
     """
     A class for getting x, y, z coordinates from points on BD Ortho
     """
 
-    def __init__(self, pva: str, ortho: str, mnt: str, ta_xml: str, resultats: str, raf: str, size_orthoLocale=141, size_bd_ortho=61, size_small_bd_ortho=5, seuil_maitresse=0.9, seuil_ortho_locale=0.4, log=False, micmac=False, decalage=False, type_correlation="pva", sauvegarde=False) -> None:
+    def __init__(self, pva: str, ortho: str, mnt: str, ta_xml: str, resultats: str, size_orthoLocale=141, size_bd_ortho=61, size_small_bd_ortho=5, seuil_maitresse=0.9, seuil_ortho_locale=0.4, log=False, micmac=False, decalage=False, type_correlation="pva", sauvegarde=False) -> None:
         self.pva = pva
         self.ortho = ortho
         self.mnt = MNT(mnt)
@@ -27,7 +27,8 @@ class Monoscopie:
         self.size_bd_ortho = size_bd_ortho
         self.seuil_maitresse = seuil_maitresse
         self.seuil_ortho_locale = seuil_ortho_locale
-        self.raf = RAF(raf)
+        plugin_path = os.path.dirname(os.path.realpath(__file__))
+        self.raf = RAF(os.path.join(plugin_path, "raf2020_2154.tif"))
         self.size_small_bd_ortho = size_small_bd_ortho
         self.log = log
         self.micmac = micmac
