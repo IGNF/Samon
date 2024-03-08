@@ -7,29 +7,29 @@ name=Samon
 qgisMinimumVersion=3.0
 description=Saisie monoscopique sur la BD Ortho
 version=0.1
-author=IGN
+author=Célestin Huet (IGN)
 email=celestin.huet@ign.fr
 
 about=Un seul clic sur la BD Ortho suffit pour obtenir les coordonnées 3D du point cliqué !
 
 tracker=http://bugs
-repository=https://gitlab.com/CHuet/samon_qgis
+repository=https://github.com/IGNF/Samon
 # End of mandatory metadata
 
 # Recommended items:
 
-hasProcessingProvider=no
+# hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
 # changelog=
 
 # Tags are comma separated with spaces allowed
 tags=python
 
-homepage=http://homepage
+# homepage=http://homepage
 category=Plugins
 icon=icon.png
 # experimental flag
-experimental=False
+experimental=True
 
 # deprecated flag (applies to the whole plugin, not just a single version)
 deprecated=False
