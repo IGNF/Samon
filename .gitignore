@@ -1,3 +1,6 @@
 __pycache__
 *.pyc
 resources_rc.py
+test.py
+reconstruction_batiment.py
+controle_lidar.py

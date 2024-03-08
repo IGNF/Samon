@@ -107,8 +107,7 @@ class Samon:
 
         self.meme_bande = False
 
-        self.mns_lidar_path = "/home/CHuet2/Documents/monoscopie/chantiers/05_2022/lidar/MNS.tif"
-        #self.mns_lidar_path = None
+        self.mns_lidar_path = None
         self.MNSLidar:MNSLidar = None
 
         if self.mns_lidar_path:
