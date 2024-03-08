@@ -40,37 +40,12 @@ class Monoscopie:
         self.sauvegarde = sauvegarde
 
         self.shots = []
-
         
         self.get_shots()
 
         # On récupère la résolution de l'ortho
         self.get_resolution()
-        """# On charge le fichier ta_xml
-        self.ta = Ta.from_xml(self.ta_xml)
-        print_log("Fichier xml chargé")
 
-        # On ajoute le MNT au projet
-        self.ta.project.add_dem(self.mnt)
-        print_log("MNT ajouté")
-
-        
-
-        # On retire les images qui ne sont pas dans le répertoire pva
-        self.remove_shot()
-
-        # Dans les fichiers TA, ce sont des hauteurs ellipsoïdales. Il faut les convertir en altitude
-        self.ta.project.conversion_elevation(self.raf, "a")
-
-        
-        print_log("Calcul des emprises au sol des clichés")
-        for shot in tqdm(self.ta.project.get_shots()):
-            shot.compute_extent(self.ta.project.dem, 4, 1, 2)
-        print_log("Emprises au sol calculées")
-
-
-        # Facultatif : on exporte les emprises des clichés
-        #self.ta.save_extent_shot("test.shp")"""
 
     
     def getFocale(self, root):
@@ -113,25 +88,6 @@ class Monoscopie:
         print_log("Résolution de l'ortho : {}".format(self.resolution))
     
 
-    """def remove_shot(self) -> None:
-
-        On retire de la liste des shots tous les shots dont les pvas correspondantes sont manquantes
-
-        pvas = [i.split(".")[0] for i in os.listdir(self.pva)]
-        compte = 0
-        for flight in self.ta.project.get_flights():
-            for strip in flight.get_strips():
-                shot_to_remove = []
-                # On récupère la liste des images qui ne sont pas dans le répertoire pva
-                for shot in strip.get_shots():
-                    if shot.image not in pvas:
-                        compte += 1
-                        shot_to_remove.append(shot)
-                # On supprime ces images
-                for shot in shot_to_remove:
-                    strip.remove_shot(shot)
-        print_log("{} images ont été retirées. Il en reste {}.".format(compte, self.ta.project.nbr_shot()))   """
-
 
     def run(self, point:Point, orthoLocaleMaitresse:OrthoLocale=None, z_min:float=None, z_max:float=None, meme_bande=False):
         """
@@ -165,23 +121,26 @@ class Monoscopie:
         self.chantier.compute_correlations(self.chantier.bd_ortho, "pi")
         print_log("compute_correlations : {}".format(time.time()-tic))
         #On affine la corrélation pour les pvas dont le score de corrélation est supérieur à self.seuil_maitresse
-        self.chantier.improve_correlations()
-        print_log("improve_correlations : {}".format(time.time()-tic))
-        #Pour toutes les images qui ne sont pas maitresses, on recherche le point de corrélation sur la droite épipolaire
-        self.chantier.compute_correl_epip(z_min, z_max)
-        print_log("compute_correl_epip : {}".format(time.time()-tic))
+        success = self.chantier.improve_correlations()
+        if not success:
+            self.infosResultats = InfosResultats(False)
+        else:
+            print_log("improve_correlations : {}".format(time.time()-tic))
+            #Pour toutes les images qui ne sont pas maitresses, on recherche le point de corrélation sur la droite épipolaire
+            self.chantier.compute_correl_epip(z_min, z_max)
+            print_log("compute_correl_epip : {}".format(time.time()-tic))
 
-        #Si on est dans le mode meme_bande, alors on récupère
-        #toutes les images du même axe de vol que l'image maîtresse
-        liste_meme_bande = []
-        if meme_bande:
-            liste_meme_bande = self.chantier.get_liste_meme_bande()
-        #On ne conserve que les orthos locales pour lesquelles le score de corrélation est supérieur à self.seuil_ortho_locale
-        self.chantier.filter_ortho_locales(self.seuil_ortho_locale, liste_meme_bande)
-        #On calcule la pseudo-intersection
-        self.lancer_calcul()
-        self.id += 1
-        print_log("Fin : {}".format(time.time()-tic))
+            #Si on est dans le mode meme_bande, alors on récupère
+            #toutes les images du même axe de vol que l'image maîtresse
+            liste_meme_bande = []
+            if meme_bande:
+                liste_meme_bande = self.chantier.get_liste_meme_bande()
+            #On ne conserve que les orthos locales pour lesquelles le score de corrélation est supérieur à self.seuil_ortho_locale
+            self.chantier.filter_ortho_locales(self.seuil_ortho_locale, liste_meme_bande)
+            #On calcule la pseudo-intersection
+            self.lancer_calcul()
+            self.id += 1
+            print_log("Fin : {}".format(time.time()-tic))
         
 
 

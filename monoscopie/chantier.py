@@ -119,68 +119,14 @@ class Chantier:
 
 
     def improve_correlations(self) -> None:
-        """
-        On améliore la précision de la corrélation sur les images ayant un score de corrélation supérieur à 0.9.
-        Il est déjà arrivé qu'à l'issue de la première recherche (compute_correlations), 
-        l'image avec le meilleur score de corrélation ne soit pas l'image maîtresse
-        """
-
-        print_log("On améliore la précision du pointé")
-        """for orthoLocale in self.ortho_locales:
-            if orthoLocale.correlation > 0.9:
-                
-                #On détermine les coordonnées autour du point de corrélation trouvé précédemment où il faut affiner la recherche
-                gt = orthoLocale.get_ground_terrain()
-                
-                x = np.arange(gt[0] - self.resolution, gt[0] + self.resolution, self.resolution/5)
-                y = np.flip(np.arange(gt[1] - self.resolution, gt[1] + self.resolution, self.resolution/5))
-
-                xv, yv = np.meshgrid(x, y)
-
-                xv_reshaped = xv.reshape((-1, 1))
-                yv_reshaped = yv.reshape((-1, 1))
-
-                #On construit des orthos locales centrées sur ces coordonnées
-                orthos = orthoLocale.create_small_ortho_numpy(xv_reshaped, yv_reshaped, self.projet.size_bd_ortho, 1)
-                orthos = np.squeeze(orthos)
-                
-                #On normalize les images
-                orthos_tild = (orthos - np.mean(orthos, axis=(1,2)).reshape((-1, 1, 1))) / np.std(orthos, axis=(1,2)).reshape((-1, 1, 1))
-                        
-                bd_ortho = np.tile(self.bd_ortho.bd_ortho[0,:,:], (orthos.shape[0], 1, 1))
-                bd_ortho_tild = (bd_ortho - np.mean(bd_ortho, axis=(1,2)).reshape((-1, 1, 1))) / np.std(bd_ortho, axis=(1,2)).reshape((-1, 1, 1))
-                        
-                #On calcule la corrélation
-                correlation = 1 - ( np.sum((bd_ortho_tild-orthos_tild)**2, axis=(1,2)) / orthos_tild.shape[1]**2)/2
-
-                correlation_max = np.max(correlation)
-                indice = np.argmax(correlation)
-                        
-                x_chap = xv_reshaped[indice].item()
-                y_chap = yv_reshaped[indice].item()
-
-                #On peut sauvegarder la vignette qui corrèle le mieux
-                if self.projet.log:
-                    driver = gdal.GetDriverByName('GTiff')
-                    outRaster = driver.Create(os.path.join(orthoLocale.path_save_pi, orthoLocale.shot.image+"_save_imp.tif"), orthos.shape[1], orthos.shape[1], 1, gdal.GDT_Byte)
-                    demi_size = (self.projet.size_bd_ortho-1)/2
-                    outRaster.SetGeoTransform((x_chap-orthoLocale.resolution * demi_size-orthoLocale.resolution/2, orthoLocale.resolution, 0, y_chap+ orthoLocale.resolution * demi_size+orthoLocale.resolution/2, 0, -orthoLocale.resolution))
-                    outband = outRaster.GetRasterBand(1)
-                    outband.WriteArray(orthos[indice, :, :])
-                    outRaster = None
-
-                orthoLocale.correlation = correlation_max
-                print_log("Image : {}, Corrélation : {}, (x,y) : ({}, {})".format(orthoLocale.shot.image, orthoLocale.correlation, x_chap, y_chap)) 
-                z_chap = self.projet.ta.project.dem.get(x_chap, y_chap).item()
-                orthoLocale.ground_terrain = Point(x_chap, y_chap, z_chap)
-
-                # On sauvegarde le point où la corrélation a été trouvée
-                orthoLocale.save_correlation("imp")"""
 
         #On trie les ortho locales de façon à ce que la première soit l'image maîtresse
         self.ortho_locales = sorted(self.ortho_locales, key=lambda d: d.correlation)
         self.ortho_locales.reverse()
+        if len(self.ortho_locales) == 0:
+            return False
         self.image_maitresse = self.ortho_locales[0]
+        return True
 
 
     def filter_ortho_locales(self, seuil: float, liste_meme_bande:List[str])->None:

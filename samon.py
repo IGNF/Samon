@@ -34,7 +34,7 @@ from .monoscopie.monoscopie import Monoscopie
 from qgis.gui import QgsMapToolEmitPoint
 from shapely.geometry import Point
 from .monoscopie.tool import print_log
-from qgis.core import QgsProject, QgsMessageLog, Qgis
+from qgis.core import QgsProject, QgsMessageLog, Qgis, QgsVectorLayer, QgsRasterLayer
 from .monoscopie.geometry import LayerGeometry
 import numpy as np
 from.monoscopie.label_z import GeometryLabelZ
@@ -44,6 +44,9 @@ from .help import HelpDialog
 from .monoscopie.lidar import MNSLidar
 from .monoscopie.infosResultats import InfosResultats
 import time
+from .preparation_chantier.prepa_chantier_1 import visualisation_chantier
+from .preparation_chantier.prepa_chantier_2 import prepa_chantier_2
+from qgis.utils import iface
 
 def print_log(message:str)->None:
     with open(os.path.join("Documents", "Monoscopie_save", "log.txt"), "a") as f:
@@ -96,7 +99,7 @@ class Samon:
         self.shortcut_meme_bande = None
         self.shortcut_saisie_pva = None
 
-        self.mode = "polygon"
+        self.mode = "point"
         self.last_z = []
         self.last_point = []
 
@@ -241,15 +244,15 @@ class Samon:
             self.shortcut_saisie_pva.activated.disconnect()
 
 
-    def select_output_file(self):
-        filename = QFileDialog.getExistingDirectory(
-            self.dlg, "Select Directory")
-        self.dlg.lineEdit_sortie.setText(filename)
+    def select_file(self, widget, text, extensions):
+        filename = QFileDialog.getOpenFileName(
+            self.dlg, text, "/home", extensions)
+        widget.setText(filename[0])
 
-    def select_PVA_directory(self):
+    def select_directory(self, widget, text):
         filename = QFileDialog.getExistingDirectory(
-            self.dlg, "Select Directory")
-        self.dlg.lineEdit_PVA.setText(filename)
+            self.dlg, text)
+        widget.setText(filename)
 
     
     def ajouter_point(self, infosResultats:InfosResultats):
@@ -445,122 +448,142 @@ class Samon:
 
 
 
+    def run_prepa_chantier1(self):
+        ta_path = self.dlg.lineEdit_prepa1_ta.text()
+        emprise_path = visualisation_chantier(ta_path)
+        iface.messageBar().pushMessage("Success !", "", level=Qgis.Success, duration=0)
+
+        vlayer_DataLabeled = QgsVectorLayer(emprise_path, "emprise", "ogr")
+        QgsProject.instance().addMapLayer(vlayer_DataLabeled, True)
+
+        self.dlg.close()
+
+
+    def run_prepa_chantier2(self):
+        ta_path = self.dlg.lineEdit_prepa2_ta.text()
+        selected_images_path = self.dlg.lineEdit_prepa2_selected_images.text()
+        oriented_images_path = self.dlg.lineEdit_prepa2_oriented_images.text()
+        storeref_path = self.dlg.lineEdit_prepa2_storeref.text()
+        self.dlg.close()
+
+        prepa_chantier_2(ta_path, selected_images_path, oriented_images_path, storeref_path)
+        iface.messageBar().pushMessage("Success !", "", level=Qgis.Success, duration=0)
+
         
 
-    def run(self):
-        global pointTool
-        """Run method that performs all the real work"""
 
+    def run_saisie(self):
+        global pointTool
+        chantier_path = self.dlg.lineEdit_saisie_chantier.text()
+        type_correlation = str(self.dlg.comboBox.currentText())
+        pva = os.path.join(chantier_path, "pvas")
+        ortho = os.path.join(chantier_path, "ortho", "ortho.vrt")
+        mnt = os.path.join(chantier_path, "mnt", "mnt.vrt")
+        ta_name = [i for i in os.listdir(chantier_path) if i[-10:]=="adjust.XML"][0]
+        ta = os.path.join(chantier_path, ta_name)
+        resultats = os.path.join(chantier_path, "resultats")
+        os.makedirs(resultats, exist_ok=True)
+        QgsMessageLog.logMessage("Début", tag="Infos Samon", level=Qgis.MessageLevel.Info)
+
+        ortho_layer = QgsRasterLayer(ortho, "ortho")
+        QgsProject.instance().addMapLayer(ortho_layer)
+
+        self.dlg.close()
+
+
+        self.projet = Monoscopie(
+                pva=pva, 
+                ortho=ortho, 
+                mnt=mnt, 
+                ta_xml=ta, 
+                resultats=resultats,
+                type_correlation=type_correlation
+            )
+
+        QgsMessageLog.logMessage("Connection", tag="Infos Samon", level=Qgis.MessageLevel.Info)
+        self.shortcut_point = QShortcut(Qt.Key.Key_P, self.iface.mainWindow())
+        self.shortcut_point.setContext(Qt.ApplicationShortcut)
+        self.shortcut_point.activated.connect(self.key_point_pressed)
+            
+        self.shortcut_polyligne = QShortcut(Qt.Key.Key_L, self.iface.mainWindow())
+        self.shortcut_polyligne.setContext(Qt.ApplicationShortcut)
+        self.shortcut_polyligne.activated.connect(self.key_polyligne_pressed)
+            
+        self.shortcut_polygone = QShortcut(Qt.Key.Key_G, self.iface.mainWindow())
+        self.shortcut_polygone.setContext(Qt.ApplicationShortcut)
+        self.shortcut_polygone.activated.connect(self.key_polygone_pressed)
+
+        self.shortcut_delete= QShortcut(Qt.Key.Key_Z, self.iface.mainWindow())
+        self.shortcut_delete.setContext(Qt.ApplicationShortcut)
+        self.shortcut_delete.activated.connect(self.key_delete_pressed)
+
+        self.shortcut_meme_bande = QShortcut(Qt.Key.Key_B, self.iface.mainWindow())
+        self.shortcut_meme_bande.setContext(Qt.ApplicationShortcut)
+        self.shortcut_meme_bande.activated.connect(self.key_meme_bande_pressed)
+
+        self.shortcut_saisie_pva = QShortcut(Qt.Key.Key_S, self.iface.mainWindow())
+        self.shortcut_saisie_pva.setContext(Qt.ApplicationShortcut)
+        self.shortcut_saisie_pva.activated.connect(self.key_saisie_pva)
+
+        self.shortcut_saisie_pva = QShortcut(Qt.Key.Key_D, self.iface.mainWindow())
+        self.shortcut_saisie_pva.setContext(Qt.ApplicationShortcut)
+        self.shortcut_saisie_pva.activated.connect(self.key_choix_orthos)
+
+        self.shortcut_saisie_pva = QShortcut(Qt.Key.Key_H, self.iface.mainWindow())
+        self.shortcut_saisie_pva.setContext(Qt.ApplicationShortcut)
+        self.shortcut_saisie_pva.activated.connect(self.key_help)
+
+
+        # On crée les trois couches qui contiendront les résultats
+        self.geom_point = LayerGeometry("point", "point", QgsProject.instance().transformContext(), resultats)
+        self.geom_linestring = LayerGeometry("linestring", "linestring", QgsProject.instance().transformContext(), resultats)
+        self.geom_polygon = LayerGeometry("polygon", "polygon", QgsProject.instance().transformContext(), resultats)
+        self.geom_altitude = GeometryLabelZ(QgsProject.instance().transformContext())
+        
+        
+
+        # On ajoute dans l'interface la couche avec les coordonnées 2D du point cliqué et les coordonnées 2D du point après calcul
+        QgsProject.instance().addMapLayer(self.geom_point.vl_2D)
+        QgsProject.instance().addMapLayer(self.geom_point.vl_3D)
+        QgsProject.instance().addMapLayer(self.geom_linestring.vl_2D)
+        QgsProject.instance().addMapLayer(self.geom_linestring.vl_3D)
+        QgsProject.instance().addMapLayer(self.geom_polygon.vl_2D)
+        QgsProject.instance().addMapLayer(self.geom_polygon.vl_3D)
+        QgsProject.instance().addMapLayer(self.geom_altitude.vl_3D)
+
+
+        # A chaque clic sur le canvas, on lance le calcul dans la fonction self.display_point
+        canvas = self.iface.mapCanvas()
+        pointTool = QgsMapToolEmitPoint(canvas)
+        pointTool.canvasClicked.connect(self.display_point)
+        canvas.setMapTool(pointTool)
+
+
+
+
+    def run(self):
+        
+        """Run method that performs all the real work"""
 
         # Create the dialog with elements (after translation) and keep reference
         # Only create GUI ONCE in callback, so that it will only load when the plugin is started
         if self.first_start == True:
             self.first_start = False
             self.dlg = SamonDialog()
-            self.dlg.pushButton_sortie.clicked.connect(self.select_output_file)
-            self.dlg.pushButton_PVA.clicked.connect(self.select_PVA_directory)  
-            
-            QgsMessageLog.logMessage("Connection", tag="Infos Samon", level=Qgis.MessageLevel.Info)
-            self.shortcut_point = QShortcut(Qt.Key.Key_P, self.iface.mainWindow())
-            self.shortcut_point.setContext(Qt.ApplicationShortcut)
-            self.shortcut_point.activated.connect(self.key_point_pressed)
-            
-            self.shortcut_polyligne = QShortcut(Qt.Key.Key_L, self.iface.mainWindow())
-            self.shortcut_polyligne.setContext(Qt.ApplicationShortcut)
-            self.shortcut_polyligne.activated.connect(self.key_polyligne_pressed)
-            
-            self.shortcut_polygone = QShortcut(Qt.Key.Key_G, self.iface.mainWindow())
-            self.shortcut_polygone.setContext(Qt.ApplicationShortcut)
-            self.shortcut_polygone.activated.connect(self.key_polygone_pressed)
+            self.dlg.pushButton_prepa1_ta.clicked.connect(lambda  : self.select_file(self.dlg.lineEdit_prepa1_ta, "Select ta", "XML files (*.xml *.XML)"))
+            self.dlg.pushButton_prepa2_ta.clicked.connect(lambda  : self.select_file(self.dlg.lineEdit_prepa2_ta, "Select ta", "XML files (*.xml *.XML)"))
+            self.dlg.pushButton_prepa2_selected_images.clicked.connect(lambda  : self.select_file(self.dlg.lineEdit_prepa2_selected_images, "Select selected images", "Shapefile (*.shp)"))
+            self.dlg.pushButton_prepa2_oriented_images.clicked.connect(lambda  : self.select_directory(self.dlg.lineEdit_prepa2_oriented_images, "Select oriented images"))
+            self.dlg.pushButton_prepa2_storeref.clicked.connect(lambda  : self.select_directory(self.dlg.lineEdit_prepa2_storeref, "Select storeref"))
+            self.dlg.pushButton_saisie_chantier.clicked.connect(lambda  : self.select_directory(self.dlg.lineEdit_saisie_chantier, "Select chantier"))
 
-            self.shortcut_delete= QShortcut(Qt.Key.Key_Z, self.iface.mainWindow())
-            self.shortcut_delete.setContext(Qt.ApplicationShortcut)
-            self.shortcut_delete.activated.connect(self.key_delete_pressed)
-
-            self.shortcut_meme_bande = QShortcut(Qt.Key.Key_B, self.iface.mainWindow())
-            self.shortcut_meme_bande.setContext(Qt.ApplicationShortcut)
-            self.shortcut_meme_bande.activated.connect(self.key_meme_bande_pressed)
-
-            self.shortcut_saisie_pva = QShortcut(Qt.Key.Key_S, self.iface.mainWindow())
-            self.shortcut_saisie_pva.setContext(Qt.ApplicationShortcut)
-            self.shortcut_saisie_pva.activated.connect(self.key_saisie_pva)
-
-            self.shortcut_saisie_pva = QShortcut(Qt.Key.Key_D, self.iface.mainWindow())
-            self.shortcut_saisie_pva.setContext(Qt.ApplicationShortcut)
-            self.shortcut_saisie_pva.activated.connect(self.key_choix_orthos)
-
-            self.shortcut_saisie_pva = QShortcut(Qt.Key.Key_H, self.iface.mainWindow())
-            self.shortcut_saisie_pva.setContext(Qt.ApplicationShortcut)
-            self.shortcut_saisie_pva.activated.connect(self.key_help)
+            self.dlg.pushButton_prepa1_run.clicked.connect(self.run_prepa_chantier1)
+            self.dlg.pushButton_prepa2_run.clicked.connect(self.run_prepa_chantier2)
+            self.dlg.pushButton_saisie_run.clicked.connect(self.run_saisie)
 
         # show the dialog
         self.dlg.show()
         # Run the dialog event loop
         result = self.dlg.exec_()
-        # See if OK was pressed
         if result:
-            # On récupère les paramètres
-            size_bd_ortho = int(self.dlg.spinBox_size_bd_ortho.text())
-            print_log("size_bd_ortho : {}".format(size_bd_ortho))
-            size_orthoLocale = int(self.dlg.spinBox_size_orthoLocale.text())
-            print_log("size_orthoLocale : {}".format(size_orthoLocale))
-            size_small_bd_ortho = int(self.dlg.spinBox_size_small_bd_ortho.text())
-            print_log("size_small_bd_ortho : {}".format(size_small_bd_ortho))
-            seuil_maitresse = float(self.dlg.doubleSpinBox_seuil_maitresse.text())
-            print_log("seuil_maitresse : {}".format(seuil_maitresse))
-            seuil_ortho_locale = float(self.dlg.doubleSpinBox_seuil_ortho_locale.text())
-            print_log("seuil_ortho_locale : {}".format(seuil_ortho_locale))
-            BD_Ortho = self.dlg.mMapLayerComboBox_BD_Ortho.currentLayer().dataProvider().dataSourceUri()
-            print_log("BD_Ortho : {}".format(BD_Ortho))
-            MNT = self.dlg.mMapLayerComboBox_MNT.currentLayer().dataProvider().dataSourceUri()
-            print_log("MNT : {}".format(MNT))
-            PVA = self.dlg.lineEdit_PVA.text()
-            print_log("PVA : {}".format(PVA))
-            type_correlation = str(self.dlg.comboBox.currentText())
-            print_log("type_correlation : {}".format(type_correlation))
-            self.sortie = self.dlg.lineEdit_sortie.text()
-            print_log("sortie : {}".format(self.sortie))
-            ta_xml = self.dlg.mQgsFileWidget_ta_xml.filePath()
-            print_log("ta_xml : {}".format(ta_xml))
-
-            print_log("Plugin dir : {}".format(self.plugin_dir))
-
-            #On instancie le projet
-            self.projet = Monoscopie(
-                pva=PVA, 
-                ortho=BD_Ortho, 
-                mnt=MNT, 
-                ta_xml=ta_xml, 
-                resultats=self.sortie, 
-                size_orthoLocale=size_orthoLocale, 
-                size_bd_ortho=size_bd_ortho, 
-                size_small_bd_ortho=size_small_bd_ortho, 
-                seuil_maitresse=seuil_maitresse, 
-                seuil_ortho_locale=seuil_ortho_locale,
-                type_correlation=type_correlation
-            )
-
-            # On crée les trois couches qui contiendront les résultats
-            self.geom_point = LayerGeometry("point", "point", QgsProject.instance().transformContext(), self.sortie)
-            self.geom_linestring = LayerGeometry("linestring", "linestring", QgsProject.instance().transformContext(), self.sortie)
-            self.geom_polygon = LayerGeometry("polygon", "polygon", QgsProject.instance().transformContext(), self.sortie)
-            self.geom_altitude = GeometryLabelZ(QgsProject.instance().transformContext())
-
-            # On ajoute dans l'interface la couche avec les coordonnées 2D du point cliqué et les coordonnées 2D du point après calcul
-            QgsProject.instance().addMapLayer(self.geom_point.vl_2D)
-            QgsProject.instance().addMapLayer(self.geom_point.vl_3D)
-            QgsProject.instance().addMapLayer(self.geom_linestring.vl_2D)
-            QgsProject.instance().addMapLayer(self.geom_linestring.vl_3D)
-            QgsProject.instance().addMapLayer(self.geom_polygon.vl_2D)
-            QgsProject.instance().addMapLayer(self.geom_polygon.vl_3D)
-            QgsProject.instance().addMapLayer(self.geom_altitude.vl_3D)
-
-
-            # A chaque clic sur le canvas, on lance le calcul dans la fonction self.display_point
-            canvas = self.iface.mapCanvas()
-            pointTool = QgsMapToolEmitPoint(canvas)
-            pointTool.canvasClicked.connect(self.display_point)
-            canvas.setMapTool(pointTool)
-
-
-
+            pass
