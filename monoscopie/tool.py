@@ -1,11 +1,13 @@
 import os
 from osgeo import gdal, osr
 import numpy as np
+from qgis.core import QgsMessageLog, Qgis
 
 def print_log(message:str)->None:
+    
     print(message)
-    #with open(os.path.join("/home", "CHuet2", "Documents", "Monoscopie_save", "log.txt"), "a") as f:
-    #    f.write("{}\n".format(str(message)))
+    #QgsMessageLog.logMessage(message, tag="Infos Samon", level=Qgis.MessageLevel.Info)
+    
 
 
 
