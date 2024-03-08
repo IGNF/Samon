@@ -12,7 +12,7 @@ email=celestin.huet@ign.fr
 
 about=Un seul clic sur la BD Ortho suffit pour obtenir les coordonnées 3D du point cliqué !
 
-tracker=http://bugs
+tracker=https://github.com/IGNF/Samon
 repository=https://github.com/IGNF/Samon
 # End of mandatory metadata
 
@@ -20,12 +20,12 @@ repository=https://github.com/IGNF/Samon
 
 # hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
-# changelog=
+changelog=0.1 First internal release
 
 # Tags are comma separated with spaces allowed
 tags=python
 
-# homepage=http://homepage
+homepage=https://github.com/IGNF/Samon
 category=Plugins
 icon=icon.png
 # experimental flag
