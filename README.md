@@ -6,13 +6,19 @@ Plugin Qgis pour la saisie monoscopique. L'objectif est de calculer les coordonn
 
 # Installation
 
-* QGIS/Extensions/Installer les extensions
-* Sélectionner Samon
+* Télécharger le zip sur le dépôt Github :
+![image](doc/download_zip.png)
+* Installer le plugin grâce au zip : Extensions/Installer gérer les extensions/Installer depuis un zip :
+![image](doc/select_zip.png)
+* Sélectionner oui sur le message suivant : 
+![image](doc/message.png)
 
 Dans le cas où il y a des problèmes de librairies qui ne sont pas installées :
 ## Windows
 * Ouvrir OSGeo4W Shell (dans le menu démarrer de Windows)
 * python -m pip install [librairie]
+* Par exemple, dans le cas où sklearn n'est pas installé, entrer dans le terminal :
+python -m pip install scikit-learn 
 
 ## Linux
 * QGIS/Extension/Console Python
@@ -64,11 +70,11 @@ Samon va ouvrir la BD Ortho et créer les fichiers qui enregistreront les points
 ## Saisie
 
 Touche h : fenêtre qui rappelle les raccourcis clavier
-p : saisir des points
-l : saisir des lignes (un clic droit permet de fermer la forme et d'en créer une nouvelle)
-g : saisir des polygones (un clic droit permet de fermer la forme et d'en créer une nouvelle)
-z : supprimer le dernier point
-s : possibilité de saisir un point sur une des orthos locales du point dernièrement saisi qui sera alors remplacé
-d : possibilité de choisir les pvas utilisées pour le calcul. Dès que l'état d'une checkbox est modifié, le calcul est relancé
+* p : saisir des points
+* l : saisir des lignes (un clic droit permet de fermer la forme et d'en créer une nouvelle)
+* g : saisir des polygones (un clic droit permet de fermer la forme et d'en créer une nouvelle)
+* z : supprimer le dernier point
+* s : possibilité de saisir un point sur une des orthos locales du point dernièrement saisi qui sera alors remplacé
+* d : possibilité de choisir les pvas utilisées pour le calcul. Dès que l'état d'une checkbox est modifié, le calcul est relancé
 
 A chaque clic, deux points sont créés : le premier est le point cliqué par l'opérateur. Le deuxième est la projection plani du point cliqué (avec correction du dévers). Deux valeurs sont affichées : l'altitude et la différence d'altitude avec le MNT.
