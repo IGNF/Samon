@@ -6,16 +6,16 @@ Plugin Qgis pour la saisie monoscopique. L'objectif est de calculer les coordonn
 
 # Installation
 
-* Télécharger le zip sur le dépôt Github :
-![image](doc/download_zip.png)
-* Installer le plugin grâce au zip : Extensions/Installer gérer les extensions/Installer depuis un zip :
-![image](doc/select_zip.png)
-* Sélectionner oui sur le message suivant : 
-![image](doc/message.png)
+* Aller dans Extensions/Installer gérer les extensions/Paramètres
+* Cocher "Afficher les extensions expérimentales"
+![image](doc/experimental.png)
+* Aller dans l'onglet "Toutes" et rechercher Samon
+* Cliquer sur "Installer l'extension expérimentale"
+![image](doc/select.png)
 
 Dans le cas où il y a des problèmes de librairies qui ne sont pas installées :
 ## Windows
-* Ouvrir OSGeo4W Shell (dans le menu démarrer de Windows)
+* Ouvrir OSGeo4W Shell (dans le menu démarrer de Windows) avec les droits administrateurs
 * python -m pip install [librairie]
 * Par exemple, dans le cas où sklearn n'est pas installé, entrer dans le terminal :
 python -m pip install scikit-learn 

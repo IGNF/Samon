@@ -48,10 +48,6 @@ from .preparation_chantier.prepa_chantier_1 import visualisation_chantier
 from .preparation_chantier.prepa_chantier_2 import prepa_chantier_2
 from qgis.utils import iface
 
-def print_log(message:str)->None:
-    with open(os.path.join("Documents", "Monoscopie_save", "log.txt"), "a") as f:
-        f.write("{}\n".format(str(message)))
-
 
 class Samon:
     """QGIS Plugin Implementation."""
