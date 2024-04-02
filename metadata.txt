@@ -6,7 +6,7 @@
 name=Samon
 qgisMinimumVersion=3.0
 description=Saisie monoscopique sur la BD Ortho
-version=0.3
+version=0.4
 author=Célestin Huet (IGN)
 email=celestin.huet@ign.fr
 
@@ -21,6 +21,7 @@ repository=https://github.com/IGNF/Samon
 # hasProcessingProvider=no
 # Uncomment the following line and add your changelog:
 changelog=
+    0.4 Case with different cameras
     0.3 Change correlation tile size
     0.2 Change icon, update readme
     0.1 First internal release

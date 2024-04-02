@@ -65,14 +65,15 @@ class Monoscopie:
     def get_shots(self):
         tree = etree.parse(self.ta_xml)
         root = tree.getroot()
-        focale = self.getFocale(root)
         centre_rep_local = self.get_centre_rep_local(root)
         pvas = [i.split(".")[0] for i in os.listdir(self.pva)]
-        for cliche in root.getiterator("cliche"):
-            image = cliche.find("image").text.strip()
-            if image in pvas:
-                shot = Shot.createShot(cliche, focale, os.path.join(self.pva, "{}.tif".format(image)), self.raf, centre_rep_local)
-                self.shots.append(shot)
+        for vol in root.getiterator("vol"):
+            focale = self.getFocale(vol)
+            for cliche in vol.getiterator("cliche"):
+                image = cliche.find("image").text.strip()
+                if image in pvas:
+                    shot = Shot.createShot(cliche, focale, os.path.join(self.pva, "{}.tif".format(image)), self.raf, centre_rep_local)
+                    self.shots.append(shot)
 
 
 
